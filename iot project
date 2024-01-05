@@ -1,0 +1,102 @@
+#define BLYNK_TEMPLATE_ID "TMPL42Ex04XGd"
+#define BLYNK_TEMPLATE_NAME "Care Monitor"
+#define BLYNK_AUTH_TOKEN "Q3kxBVf9Sn7ZmeSn3e-q-Aey4rC9Mhqh"
+
+
+
+char ssid[] = "HUAWEI_B818_E2A0";
+char pass[] = "ae27nJdG2mq7A4bb";
+
+
+
+
+#include <SPI.h>
+#include <WiFiNINA.h>
+#include <BlynkSimpleWiFiNINA.h>
+#include <Arduino_MKRIoTCarrier.h>
+
+MKRIoTCarrier carrier;
+BlynkTimer timer;
+float temperature=0;
+uint32_t t0;
+bool pirStatus = false;
+
+void environment_variables(){
+  // display setup
+  carrier.display.fillScreen(ST77XX_WHITE);
+  carrier.display.setTextColor(ST77XX_RED);
+  carrier.display.setTextSize(2);
+  
+  int smoke=analogRead(A0);
+  float temperature = carrier.Env.readTemperature();
+  float humidity = carrier.Env.readHumidity();
+  float pressure = carrier.Pressure.readPressure();
+  
+  carrier.display.setCursor(20, 90);
+  carrier.display.print("Temperature: ");
+  carrier.display.print(temperature);
+  
+  carrier.display.setCursor(30, 120);
+  carrier.display.print("Humidity: ");
+  carrier.display.print(humidity);
+
+  carrier.display.setCursor(30, 150);
+  carrier.display.print("Pressure: ");
+  carrier.display.print(pressure);
+
+  carrier.display.setCursor(30, 180);
+  carrier.display.print("Smoke: ");
+  carrier.display.print(smoke);
+
+  Blynk.virtualWrite(V0, temperature);
+  Blynk.virtualWrite(V2, humidity);
+  Blynk.virtualWrite(V3, smoke);
+  Blynk.virtualWrite(V1, pressure);
+
+  if (temperature>30||temperature<5){
+    Blynk.logEvent("temperature_monitor","Bad room condition");
+  }
+  if(smoke>150) {
+    Blynk.logEvent("smoke_sensor","smoke detected");
+  }
+//if PIR sensor on pin A6 is high and logic switch is low then print the status on screen
+  if (digitalRead(A6) && pirStatus == false) {
+    carrier.display.setCursor(20, 60);
+    carrier.display.print("Motion detected");
+  
+    Serial.println("PIR tripped");
+    pirStatus = true; //turn on the PIR logic switch
+    t0 = millis(); //take a timestamp for how long the logic switch on
+  }
+  //Turn off the logic switch after 6 seconds
+  if (millis() - t0 > 6000) {
+    carrier.display.setCursor(20, 60);
+    carrier.display.print("No Motion detected");
+    pirStatus = false;
+  
+  }
+
+  Serial.println(temperature);
+  Serial.println(humidity);
+  Serial.println(pressure);
+  Serial.println(smoke);
+  delay(800);
+}
+
+void setup() {
+  // Debug console
+  Serial.begin(9600);
+  carrier.noCase();
+  carrier.begin();
+  carrier.display.setRotation(0);
+  pinMode(A6,INPUT);
+  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass); //xonnect to Blynk Cloud
+  timer.setInterval(1L, environment_variables);
+  
+}
+
+
+void loop(){
+  Blynk.run(); //Run the Blynk connection
+  timer.run(); //Run the Blynk timer
+}
